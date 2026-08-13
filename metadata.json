@@ -1,0 +1,6 @@
+{
+  "name": "TeacherMate NG",
+  "description": "The AI Assistant for Nigerian Teachers — Generate Lesson Plans, Exam Questions, Schemes of Work, Notes & Marking Schemes based on the Nigerian Curriculum with PDF export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
