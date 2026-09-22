@@ -2,7 +2,8 @@ package com.example
 
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
-import com.example.ui.theme.MyApplicationTheme
+import com.example.ui.screens.StructuredLessonPlanContent
+import com.example.ui.theme.TeacherMateTheme
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
@@ -20,8 +21,20 @@ class GreetingScreenshotTest {
   @get:Rule val composeTestRule = createComposeRule()
 
   @Test
-  fun greeting_screenshot() {
-    composeTestRule.setContent { MyApplicationTheme { Greeting("Robolectric") } }
+  fun lessonPlan_screenshot() {
+    composeTestRule.setContent {
+      TeacherMateTheme {
+        StructuredLessonPlanContent(
+          content = """
+            ## 1. BEHAVIORAL OBJECTIVES
+            By the end of the lesson, learners will solve linear equations.
+            
+            ## 2. INSTRUCTIONAL MATERIALS
+            Graph sheet, ruler, chalkboard grid.
+          """.trimIndent()
+        )
+      }
+    }
 
     composeTestRule.onRoot().captureRoboImage(filePath = "src/test/screenshots/greeting.png")
   }

@@ -24,6 +24,7 @@ import java.io.File
 
 enum class AppNavTab {
     HOME,
+    LESSON_PLAN,
     LIBRARY,
     CURRICULUM,
     RESULT_TOOL
@@ -67,6 +68,187 @@ class TeacherMateViewModel(application: Application) : AndroidViewModel(applicat
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    // --- Dedicated Lesson Plan Generator State ---
+    private val _lessonPlanSubject = MutableStateFlow("Mathematics")
+    val lessonPlanSubject: StateFlow<String> = _lessonPlanSubject.asStateFlow()
+
+    private val _lessonPlanGrade = MutableStateFlow(EducationLevel.JSS_2)
+    val lessonPlanGrade: StateFlow<EducationLevel> = _lessonPlanGrade.asStateFlow()
+
+    private val _lessonPlanTopic = MutableStateFlow("Linear Equations and Graphical Solution")
+    val lessonPlanTopic: StateFlow<String> = _lessonPlanTopic.asStateFlow()
+
+    private val _lessonPlanSubTopic = MutableStateFlow("Solving Linear Equations with Two Unknowns")
+    val lessonPlanSubTopic: StateFlow<String> = _lessonPlanSubTopic.asStateFlow()
+
+    private val _lessonPlanTerm = MutableStateFlow(SchoolTerm.FIRST_TERM)
+    val lessonPlanTerm: StateFlow<SchoolTerm> = _lessonPlanTerm.asStateFlow()
+
+    private val _lessonPlanDuration = MutableStateFlow("40 Minutes (Single Period)")
+    val lessonPlanDuration: StateFlow<String> = _lessonPlanDuration.asStateFlow()
+
+    private val _lessonPlanAids = MutableStateFlow("Graph sheets, ruler, chalkboard grid, flashcards")
+    val lessonPlanAids: StateFlow<String> = _lessonPlanAids.asStateFlow()
+
+    private val _lessonPlanCustomNotes = MutableStateFlow("")
+    val lessonPlanCustomNotes: StateFlow<String> = _lessonPlanCustomNotes.asStateFlow()
+
+    private val _activeLessonPlan = MutableStateFlow<SavedMaterial?>(null)
+    val activeLessonPlan: StateFlow<SavedMaterial?> = _activeLessonPlan.asStateFlow()
+
+    private val _isGeneratingPlan = MutableStateFlow(false)
+    val isGeneratingPlan: StateFlow<Boolean> = _isGeneratingPlan.asStateFlow()
+
+    private val _lessonPlanProgressStep = MutableStateFlow("")
+    val lessonPlanProgressStep: StateFlow<String> = _lessonPlanProgressStep.asStateFlow()
+
+    private val _lessonPlanAiNotice = MutableStateFlow<String?>(null)
+    val lessonPlanAiNotice: StateFlow<String?> = _lessonPlanAiNotice.asStateFlow()
+
+    private val _lessonPlanError = MutableStateFlow<String?>(null)
+    val lessonPlanError: StateFlow<String?> = _lessonPlanError.asStateFlow()
+
+    fun setLessonPlanSubject(subject: String) {
+        _lessonPlanSubject.value = subject
+    }
+
+    fun setLessonPlanGrade(grade: EducationLevel) {
+        _lessonPlanGrade.value = grade
+    }
+
+    fun setLessonPlanTopic(topic: String) {
+        _lessonPlanTopic.value = topic
+    }
+
+    fun setLessonPlanSubTopic(subTopic: String) {
+        _lessonPlanSubTopic.value = subTopic
+    }
+
+    fun setLessonPlanTerm(term: SchoolTerm) {
+        _lessonPlanTerm.value = term
+    }
+
+    fun setLessonPlanDuration(duration: String) {
+        _lessonPlanDuration.value = duration
+    }
+
+    fun setLessonPlanAids(aids: String) {
+        _lessonPlanAids.value = aids
+    }
+
+    fun setLessonPlanCustomNotes(notes: String) {
+        _lessonPlanCustomNotes.value = notes
+    }
+
+    fun clearLessonPlanInputs() {
+        _lessonPlanTopic.value = ""
+        _lessonPlanSubTopic.value = ""
+        _lessonPlanCustomNotes.value = ""
+        _activeLessonPlan.value = null
+        _lessonPlanError.value = null
+        _lessonPlanAiNotice.value = null
+    }
+
+    fun prefillAndNavigateToLessonPlan(subject: String, grade: EducationLevel, topic: String) {
+        _lessonPlanSubject.value = subject
+        _lessonPlanGrade.value = grade
+        _lessonPlanTopic.value = topic
+        _lessonPlanSubTopic.value = ""
+        _activeLessonPlan.value = null
+        _currentNavTab.value = AppNavTab.LESSON_PLAN
+    }
+
+    fun generateLessonPlanFromScreen() {
+        val topic = _lessonPlanTopic.value.trim()
+        if (topic.isBlank()) {
+            _lessonPlanError.value = "Please enter a lesson topic"
+            return
+        }
+
+        viewModelScope.launch {
+            _isGeneratingPlan.value = true
+            _lessonPlanError.value = null
+            _lessonPlanProgressStep.value = "Connecting to Gemini 3.5 API..."
+
+            val grade = _lessonPlanGrade.value
+            val subject = _lessonPlanSubject.value
+            val term = _lessonPlanTerm.value
+            val subTopic = _lessonPlanSubTopic.value
+            val duration = _lessonPlanDuration.value
+            val aids = _lessonPlanAids.value
+            val customNotes = _lessonPlanCustomNotes.value
+
+            val combinedInstructions = buildString {
+                append("Duration: $duration. ")
+                if (aids.isNotBlank()) append("Preferred Instructional Aids: $aids. ")
+                if (customNotes.isNotBlank()) append("Special Pedagogical Focus: $customNotes.")
+            }
+
+            try {
+                _lessonPlanProgressStep.value = "Structuring 8-step NERDC presentation..."
+                val result = GeminiAiService.generateMaterial(
+                    category = MaterialCategory.LESSON_PLAN,
+                    schoolLevel = grade.displayName,
+                    subject = subject,
+                    term = term.displayName,
+                    topic = topic,
+                    subTopic = subTopic,
+                    customInstructions = combinedInstructions
+                )
+
+                val newMaterial = SavedMaterial(
+                    category = MaterialCategory.LESSON_PLAN.name,
+                    title = "Lesson Plan: $topic",
+                    educationLevel = grade.displayName,
+                    subject = subject,
+                    term = term.displayName,
+                    topic = topic,
+                    subTopic = subTopic,
+                    content = result.content,
+                    createdAt = System.currentTimeMillis()
+                )
+
+                val savedId = repository.saveMaterial(newMaterial)
+                val savedItem = newMaterial.copy(id = savedId)
+
+                _activeLessonPlan.value = savedItem
+                _lessonPlanAiNotice.value = result.notice ?: (if (result.isAiGenerated) "Generated with Gemini 3.5 AI" else "Generated with Offline NERDC Engine")
+                _isGeneratingPlan.value = false
+            } catch (e: Exception) {
+                _isGeneratingPlan.value = false
+                _lessonPlanError.value = "Failed to generate: ${e.message}"
+            }
+        }
+    }
+
+    fun refineActiveLessonPlan(instruction: String) {
+        val current = _activeLessonPlan.value ?: return
+        viewModelScope.launch {
+            _isGeneratingPlan.value = true
+            _lessonPlanProgressStep.value = "Refining lesson plan with Gemini AI..."
+            try {
+                val result = GeminiAiService.refineLessonPlan(current.content, instruction)
+                val updated = current.copy(content = result.content)
+                repository.updateMaterial(updated)
+                _activeLessonPlan.value = updated
+                _lessonPlanAiNotice.value = result.notice
+                _isGeneratingPlan.value = false
+            } catch (e: Exception) {
+                _isGeneratingPlan.value = false
+                _lessonPlanError.value = "Refinement failed: ${e.message}"
+            }
+        }
+    }
+
+    fun updateActivePlanContent(newContent: String) {
+        val current = _activeLessonPlan.value ?: return
+        viewModelScope.launch {
+            val updated = current.copy(content = newContent)
+            repository.updateMaterial(updated)
+            _activeLessonPlan.value = updated
+        }
+    }
 
     fun setNavTab(tab: AppNavTab) {
         _currentNavTab.value = tab

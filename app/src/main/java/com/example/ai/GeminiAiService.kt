@@ -152,4 +152,96 @@ object GeminiAiService {
             )
         }
     }
+
+    suspend fun refineLessonPlan(
+        currentContent: String,
+        refinementInstruction: String
+    ): GenerationResult = withContext(Dispatchers.IO) {
+        val apiKey = try {
+            BuildConfig.GEMINI_API_KEY
+        } catch (e: Exception) {
+            ""
+        }
+
+        val hasValidKey = apiKey.isNotBlank() && apiKey != "MY_GEMINI_API_KEY"
+
+        if (!hasValidKey) {
+            return@withContext GenerationResult(
+                content = currentContent + "\n\n---\n### AI Note (Offline Mode):\n*Applied refinement request: $refinementInstruction*",
+                isAiGenerated = false,
+                notice = "Refinement applied in offline mode."
+            )
+        }
+
+        try {
+            val systemPrompt = NigerianCurriculumPromptBuilder.buildSystemPrompt() + 
+                "\nYou are refining an existing Nigerian NERDC Lesson Plan according to the teacher's instructions. Preserve the 8-step structure and output the updated complete lesson plan."
+
+            val userPrompt = """
+                Here is the current Nigerian NERDC Lesson Plan:
+                $currentContent
+
+                TEACHER'S REFINEMENT REQUEST:
+                $refinementInstruction
+
+                Please revise and enhance the lesson plan according to these instructions while keeping the standard 8-step Nigerian format and professional pedagogical rigor.
+            """.trimIndent()
+
+            val requestJson = JSONObject().apply {
+                put("systemInstruction", JSONObject().apply {
+                    put("parts", JSONArray().put(JSONObject().put("text", systemPrompt)))
+                })
+                put("contents", JSONArray().put(JSONObject().apply {
+                    put("parts", JSONArray().put(JSONObject().put("text", userPrompt)))
+                }))
+                put("generationConfig", JSONObject().apply {
+                    put("temperature", 0.6)
+                    put("topP", 0.95)
+                    put("topK", 40)
+                })
+            }
+
+            val requestBody = requestJson.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
+            val request = Request.Builder()
+                .url("$BASE_URL?key=$apiKey")
+                .post(requestBody)
+                .build()
+
+            val response = okHttpClient.newCall(request).execute()
+            val responseBody = response.body?.string()
+
+            if (response.isSuccessful && responseBody != null) {
+                val jsonObject = JSONObject(responseBody)
+                val candidates = jsonObject.optJSONArray("candidates")
+                if (candidates != null && candidates.length() > 0) {
+                    val firstCandidate = candidates.getJSONObject(0)
+                    val contentObj = firstCandidate.optJSONObject("content")
+                    val parts = contentObj?.optJSONArray("parts")
+                    if (parts != null && parts.length() > 0) {
+                        val text = parts.getJSONObject(0).optString("text")
+                        if (text.isNotBlank()) {
+                            return@withContext GenerationResult(
+                                content = text,
+                                isAiGenerated = true,
+                                notice = "Refined via Gemini 3.5 Flash."
+                            )
+                        }
+                    }
+                }
+            }
+
+            GenerationResult(
+                content = currentContent,
+                isAiGenerated = false,
+                notice = "Could not reach Gemini API. Keeping current version."
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during lesson plan refinement: ${e.message}", e)
+            GenerationResult(
+                content = currentContent,
+                isAiGenerated = false,
+                notice = "Error contacting Gemini: ${e.message}"
+            )
+        }
+    }
 }

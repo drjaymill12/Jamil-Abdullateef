@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Assessment
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Home
@@ -83,7 +84,7 @@ fun MainAppContent(
                         selected = currentTab == AppNavTab.HOME,
                         onClick = { viewModel.setNavTab(AppNavTab.HOME) },
                         icon = { Icon(imageVector = Icons.Default.Home, contentDescription = "Home") },
-                        label = { Text("Home", fontSize = 10.5.sp, fontWeight = if (currentTab == AppNavTab.HOME) FontWeight.Bold else FontWeight.Medium) },
+                        label = { Text("Home", fontSize = 10.sp, fontWeight = if (currentTab == AppNavTab.HOME) FontWeight.Bold else FontWeight.Medium) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = GreenPrimary,
                             selectedTextColor = GreenPrimary,
@@ -95,10 +96,25 @@ fun MainAppContent(
                     )
 
                     NavigationBarItem(
+                        selected = currentTab == AppNavTab.LESSON_PLAN,
+                        onClick = { viewModel.setNavTab(AppNavTab.LESSON_PLAN) },
+                        icon = { Icon(imageVector = Icons.Default.AutoAwesome, contentDescription = "Lesson Plan") },
+                        label = { Text("Lesson Plan", fontSize = 10.sp, fontWeight = if (currentTab == AppNavTab.LESSON_PLAN) FontWeight.Bold else FontWeight.Medium) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = GreenPrimary,
+                            selectedTextColor = GreenPrimary,
+                            unselectedIconColor = TextSecondaryLight,
+                            unselectedTextColor = TextSecondaryLight,
+                            indicatorColor = ChipSelectedBg
+                        ),
+                        modifier = Modifier.testTag("nav_item_lesson_plan")
+                    )
+
+                    NavigationBarItem(
                         selected = currentTab == AppNavTab.LIBRARY,
                         onClick = { viewModel.setNavTab(AppNavTab.LIBRARY) },
                         icon = { Icon(imageVector = Icons.Default.Bookmark, contentDescription = "Library") },
-                        label = { Text("Downloads (${savedMaterials.size})", fontSize = 10.5.sp, fontWeight = if (currentTab == AppNavTab.LIBRARY) FontWeight.Bold else FontWeight.Medium) },
+                        label = { Text("Downloads (${savedMaterials.size})", fontSize = 10.sp, fontWeight = if (currentTab == AppNavTab.LIBRARY) FontWeight.Bold else FontWeight.Medium) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = GreenPrimary,
                             selectedTextColor = GreenPrimary,
@@ -113,7 +129,7 @@ fun MainAppContent(
                         selected = currentTab == AppNavTab.CURRICULUM,
                         onClick = { viewModel.setNavTab(AppNavTab.CURRICULUM) },
                         icon = { Icon(imageVector = Icons.Default.AutoStories, contentDescription = "Curriculum") },
-                        label = { Text("Curriculum", fontSize = 10.5.sp, fontWeight = if (currentTab == AppNavTab.CURRICULUM) FontWeight.Bold else FontWeight.Medium) },
+                        label = { Text("Curriculum", fontSize = 10.sp, fontWeight = if (currentTab == AppNavTab.CURRICULUM) FontWeight.Bold else FontWeight.Medium) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = GreenPrimary,
                             selectedTextColor = GreenPrimary,
@@ -128,7 +144,7 @@ fun MainAppContent(
                         selected = currentTab == AppNavTab.RESULT_TOOL,
                         onClick = { viewModel.setNavTab(AppNavTab.RESULT_TOOL) },
                         icon = { Icon(imageVector = Icons.Default.Assessment, contentDescription = "Remarks") },
-                        label = { Text("Results", fontSize = 10.5.sp, fontWeight = if (currentTab == AppNavTab.RESULT_TOOL) FontWeight.Bold else FontWeight.Medium) },
+                        label = { Text("Results", fontSize = 10.sp, fontWeight = if (currentTab == AppNavTab.RESULT_TOOL) FontWeight.Bold else FontWeight.Medium) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = GreenPrimary,
                             selectedTextColor = GreenPrimary,
@@ -149,7 +165,9 @@ fun MainAppContent(
                     selectedLevelFilter = selectedLevelFilter,
                     onSelectLevelFilter = { viewModel.setLevelFilter(it) },
                     onOpenCategory = { cat ->
-                        if (cat == MaterialCategory.CURRICULUM_GUIDE) {
+                        if (cat == MaterialCategory.LESSON_PLAN) {
+                            viewModel.setNavTab(AppNavTab.LESSON_PLAN)
+                        } else if (cat == MaterialCategory.CURRICULUM_GUIDE) {
                             viewModel.setNavTab(AppNavTab.CURRICULUM)
                         } else if (cat == MaterialCategory.RESULT_GENERATOR) {
                             viewModel.setNavTab(AppNavTab.RESULT_TOOL)
@@ -160,6 +178,14 @@ fun MainAppContent(
                     onViewMaterial = { mat -> viewModel.viewMaterial(mat) },
                     onOpenLibrary = { viewModel.setNavTab(AppNavTab.LIBRARY) },
                     onExportPdf = { mat -> viewModel.exportAndOpenPdf(context, mat) },
+                    modifier = Modifier.padding(innerPadding)
+                )
+            }
+
+            AppNavTab.LESSON_PLAN -> {
+                LessonPlanGeneratorScreen(
+                    viewModel = viewModel,
+                    onViewFullDocument = { mat -> viewModel.viewMaterial(mat) },
                     modifier = Modifier.padding(innerPadding)
                 )
             }
@@ -178,14 +204,18 @@ fun MainAppContent(
             AppNavTab.CURRICULUM -> {
                 CurriculumHubScreen(
                     onGenerateForTopic = { cat, level, subj, topic ->
-                        viewModel.generateMaterial(
-                            category = cat,
-                            schoolLevel = level,
-                            subject = subj,
-                            term = com.example.model.SchoolTerm.FIRST_TERM,
-                            topic = topic,
-                            onCompleted = { mat -> viewModel.viewMaterial(mat) }
-                        )
+                        if (cat == MaterialCategory.LESSON_PLAN) {
+                            viewModel.prefillAndNavigateToLessonPlan(subj, level, topic)
+                        } else {
+                            viewModel.generateMaterial(
+                                category = cat,
+                                schoolLevel = level,
+                                subject = subj,
+                                term = com.example.model.SchoolTerm.FIRST_TERM,
+                                topic = topic,
+                                onCompleted = { mat -> viewModel.viewMaterial(mat) }
+                            )
+                        }
                     },
                     modifier = Modifier.padding(innerPadding)
                 )
